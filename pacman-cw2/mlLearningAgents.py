@@ -56,9 +56,10 @@ class QLearnAgent(Agent):
         self.prevState = None
         self.prevAction = None
         self.prevScore = None
-
+        # keep track of scores while training
+        self.won = []
     
-    # Accessor functions for the variable episodesSoFars controlling learning
+    # Accessor functions for the variable episodesSoFar
     def incrementEpisodesSoFar(self):
         self.episodesSoFar +=1
 
@@ -90,8 +91,6 @@ class QLearnAgent(Agent):
     # The main method required by the game. Called every time that
     # Pacman is expected to move
     def getAction(self, state):
-        # print "state: ", state
-
         # The data we have about the state of the game
         legal = state.getLegalPacmanActions()
         # if Directions.STOP in legal:
@@ -104,15 +103,11 @@ class QLearnAgent(Agent):
         # print "Score: ", state.getScore()
 
         # Update Q-table
-        # print 'update q-table: ', self.prevState, self.prevAction, self.prevScore
         self.updateQTable(state, legal)
 
-        # Now pick what action to take. For now a random choice among
-        # the legal moves
-        # pick = random.choice(legal)
-
-        exploration_rate_threshold = random.uniform(0, 1)
-        if exploration_rate_threshold > self.epsilon:
+        # Act randomly with probability epsilon
+        randNum = random.uniform(0, 1)
+        if randNum > self.epsilon:
             pick = self.getActionFromQTable(state, legal)
         else:
             # print "Action picked randomly"
@@ -124,7 +119,6 @@ class QLearnAgent(Agent):
         self.prevAction = pick
         self.prevScore = state.getScore()
 
-        # print ""
         # We have to return an action
         return pick
             
@@ -136,6 +130,7 @@ class QLearnAgent(Agent):
 
         # print "A game just ended!"
 
+        # Update Q-Table
         self.updateQTable(state, [])
 
         # Resetting for next episode
@@ -147,30 +142,39 @@ class QLearnAgent(Agent):
         # parameters to zero when we are done with the pre-set number
         # of training episodes
         self.incrementEpisodesSoFar()
+
+        if self.getEpisodesSoFar() < self.getNumTraining():
+            if state.isWin():
+                self.won.append(True)
+            else:
+                self.won.append(False)
+
+            printAfterEps = 100
+            if (self.getEpisodesSoFar() + 1) % printAfterEps == 0:
+                print "Episodes ", (self.getEpisodesSoFar() + 1) - printAfterEps, " to ", self.getEpisodesSoFar() + 1, \
+                    ". Won: ", sum(self.won)
+                self.won = []
+
+            # if self.getEpisodesSoFar() > 1990:
+            #     print(self.getEpisodesSoFar())
+
         if self.getEpisodesSoFar() == self.getNumTraining():
             msg = 'Training Done (turning off epsilon and alpha)'
             print '%s\n%s' % (msg,'-' * len(msg))
             self.setAlpha(0)
             self.setEpsilon(0)
 
+    # Getter funcion for Q-value. Get's Q(state, action) from Q-table.
     def getQValue(self, state, action):
-
+        # Extract relevant state from state object.
         relState = self.getRelState(state)
-
-        # if (relState, action) in self.qTable and self.qTable[(relState, action)] != 0:
-        #     print "ALREADY IN QTABLE"
-        # else:
-        #     self.qTable[(relState, action)] = 0
 
         if (relState, action) not in self.qTable:
             self.qTable[(relState, action)] = 0
 
         return self.qTable[(relState, action)]
 
-    # def setQVal(self, state, action, qVal):
-    #     relState = self.getRelState(state)
-    #     self.qTable[(relState, action)] = qVal
-
+    # Get action a such that Q(state, a) is maximum.
     def getActionFromQTable(self, state, legal):
         # print "getActionFromQTable called"
         # qVals = [self.getQValue(relState, action) for action in legal]
@@ -179,21 +183,17 @@ class QLearnAgent(Agent):
             qVals.append(self.getQValue(state, action))
         return legal[argmax(qVals)]
 
+    # Function to update Q-Table using Bellman Equation
     def updateQTable(self, state, legal):
         # print "updateQTable called"
-        # if not self.prevState:
-        #     return
 
         # Don't update Q-table on first time step of episode
         if not (self.prevState and self.prevAction):
-            # print "Not updating q-table cuz first time step"
-            # print "prevState: ", self.prevState
-            # print "prevAction: ", self.prevAction
-            # print "prevScore: ", self.prevScore
+            # print "Not updating q-table because first time step"
             return
 
         if not legal:
-            # If no legal moves, we are stuck or in a terminal state, so future rewards = 0.
+            # If no legal moves, we are stuck or are in a terminal state, so future rewards = 0.
             # print "No legal moves"
             maxQVal = 0
         else:
@@ -206,18 +206,23 @@ class QLearnAgent(Agent):
 
         alpha, gamma = self.getAlpha(), self.getGamma()
         reward = state.getScore() - self.prevScore
-        # print "Reward is: ", reward
         learnedValue = reward + gamma * maxQVal
         newQVal = self.getQValue(self.prevState, self.prevAction) * (1 - alpha) + alpha * learnedValue
 
         # Update q(prevState, prevAction)
         self.qTable[(self.getRelState(self.prevState), self.prevAction)] = newQVal
-        # print "Updated Q-table: ", self.qTable
 
+    # We consider two states to be identical if the positions
+    # of Pacman, ghost(s) and food are the same. So we extract
+    # state with only this relevant information (relState)
+    # from state object.
+    # Assume that position of the food is the same in training
+    # examples as in test examples.
     def getRelState(self, state):
         # Cast state.getGhostPositions() to tuple since lists are unhashable
         return state.getPacmanPosition(), tuple(state.getGhostPositions())
 
-# Helper function
+
+# Helper function. Returns index of max value.
 def argmax(iterable):
     return max(enumerate(iterable), key=lambda x: x[1])[0]
