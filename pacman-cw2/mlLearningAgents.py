@@ -98,13 +98,7 @@ class QLearnAgent(Agent):
         print state.getFood()
         print "Score: ", state.getScore()
 
-        for action in legal:
-            if (state, action) in self.qTable:
-                print "ALREADY IN QTABLE"
-            else:
-                self.qTable[(state, action)] = 0
-
-                # Now pick what action to take. For now a random choice among
+        # Now pick what action to take. For now a random choice among
         # the legal moves
         # pick = random.choice(legal)
 
@@ -112,6 +106,7 @@ class QLearnAgent(Agent):
         if exploration_rate_threshold > self.epsilon:
             pick = self.getActionFromQTable(state, legal)
         else:
+            print "Action picked randomly"
             pick = random.choice(legal)
 
         # We have to return an action
@@ -136,12 +131,23 @@ class QLearnAgent(Agent):
             self.setAlpha(0)
             self.setEpsilon(0)
 
+    def getQValue(self, state, action):
+        if (state, action) in self.qTable:
+            print "ALREADY IN QTABLE"
+        else:
+            self.qTable[(state, action)] = 0
+        return self.qTable[(state, action)]
+
     def getActionFromQTable(self, state, legal):
         # print "getActionFromQTable called"
+        # qVals = [self.getQValue(state, action) for action in legal]
         qVals = []
         for action in legal:
-            qVals.append(self.qTable[(state, action)])
+            qVals.append(self.getQValue(state, action))
         return legal[argmax(qVals)]
+
+    # def updateQTable(self):
+
 
 
 # Helper function
