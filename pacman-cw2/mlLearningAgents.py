@@ -51,6 +51,11 @@ class QLearnAgent(Agent):
         self.episodesSoFar = 0
         # Initialize q-table
         self.qTable = dict()
+        # Save previous state, previous action and previous score in
+        # order to update Q-table
+        self.prevState = None
+        self.prevAction = None
+        self.prevScore = None
 
     
     # Accessor functions for the variable episodesSoFars controlling learning
@@ -98,6 +103,10 @@ class QLearnAgent(Agent):
         print state.getFood()
         print "Score: ", state.getScore()
 
+        # Update Q-table
+        # print 'update q-table: ', self.prevState, self.prevAction, self.prevScore
+        self.updateQTable(state, legal)
+
         # Now pick what action to take. For now a random choice among
         # the legal moves
         # pick = random.choice(legal)
@@ -109,6 +118,13 @@ class QLearnAgent(Agent):
             print "Action picked randomly"
             pick = random.choice(legal)
 
+        # Update self.prevState, self.prevAction, self.prevScore
+        # for use in next time step
+        self.prevState = state
+        self.prevAction = pick
+        self.prevScore = state.getScore()
+
+        print ""
         # We have to return an action
         return pick
             
@@ -119,6 +135,9 @@ class QLearnAgent(Agent):
     def final(self, state):
 
         print "A game just ended!"
+
+        self.updateQTable(state, [])
+
         print "q-table: ", self.qTable
         
         # Keep track of the number of games played, and set learning
@@ -132,10 +151,14 @@ class QLearnAgent(Agent):
             self.setEpsilon(0)
 
     def getQValue(self, state, action):
-        if (state, action) in self.qTable:
-            print "ALREADY IN QTABLE"
-        else:
+        # if (state, action) in self.qTable:
+        #     # print "ALREADY IN QTABLE"
+        # else:
+        #     self.qTable[(state, action)] = 0
+
+        if (state, action) not in self.qTable:
             self.qTable[(state, action)] = 0
+
         return self.qTable[(state, action)]
 
     def getActionFromQTable(self, state, legal):
@@ -146,9 +169,38 @@ class QLearnAgent(Agent):
             qVals.append(self.getQValue(state, action))
         return legal[argmax(qVals)]
 
-    # def updateQTable(self):
+    def updateQTable(self, state, legal):
+        print "updateQTable called"
+        # if not self.prevState:
+        #     return
 
+        # Don't update Q-table on first time step of episode
+        if not (self.prevState and self.prevAction):
+            print "Not updating q-table cuz first time step"
+            # print "prevState: ", self.prevState
+            # print "prevAction: ", self.prevAction
+            # print "prevScore: ", self.prevScore
+            return
 
+        if not legal:
+            # If no legal moves we are stuck or in a terminal state, so no future rewards.
+            print "No legal moves"
+            maxQVal = 0
+        else:
+            # Get max Q Value i.e. max(Q(state, a)) for all a in legal
+            # qVals = [self.getQValue(state, action) for action in legal]
+            qVals = []
+            for action in legal:
+                qVals.append(self.getQValue(state, action))
+            maxQVal = max(qVals)
+
+        alpha, gamma = self.getAlpha(), self.getGamma()
+        reward = state.getScore() - self.prevScore
+        # print "Reward is: ", reward
+        learnedValue = reward + gamma * maxQVal
+        newQVal = self.getQValue(self.prevState, self.prevAction) * (1 - alpha) + alpha * learnedValue
+        self.qTable[(self.prevState, self.prevAction)] = newQVal
+        print "Updated Q-table: ", self.qTable
 
 # Helper function
 def argmax(iterable):
